@@ -4,11 +4,6 @@
       "dependsOn": [
         "^build"
       ]
-    },
-    "@lab/vault:build": {
-      "outputs": [
-        "out/**"
-      ]
     }
   }
 }
