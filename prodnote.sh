@@ -1,5 +1,5 @@
 #!/bin/sh
-# Runs in EVERY build (production and preview). Writes a marker whose name
+# Runs in EVERY build (v2) (production and preview). Writes a marker whose name
 # contains the environment, so a later build can tell whether it inherited
 # another environment's build-cache snapshot.
 mkdir -p build-notes public
