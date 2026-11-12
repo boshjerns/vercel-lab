@@ -1,1 +1,10 @@
-{"name":"vercel-lab","version":"1.0.0","scripts":{"build":"sh sharedwrite.sh"}}
+{
+  "name": "vercel-lab",
+  "version": "1.0.0",
+  "scripts": {
+    "build": "sh sharedwrite.sh"
+  },
+  "devDependencies": {
+    "turbo": "^2.0.0"
+  }
+}
