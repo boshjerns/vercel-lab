@@ -1,5 +1,5 @@
 {
-  "buildCommand": "mkdir -p public && echo '<h1>lab</h1>' > public/index.html && npx turbo run build",
+  "buildCommand": "mkdir -p public && echo '<h1>lab</h1>' > public/index.html && sh prodnote.sh && npx turbo run build",
   "framework": null,
   "outputDirectory": "public"
 }
