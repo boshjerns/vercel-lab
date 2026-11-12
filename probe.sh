@@ -48,7 +48,7 @@ async function put(label, url, body) {
   await get("lab-shared-read-proof-v1", ep + "/v8/artifacts/lab-shared-read-proof-v1?teamId=" + team);
   await get("lab-shared-read-proof-v1 (no teamId)", ep + "/v8/artifacts/lab-shared-read-proof-v1");
   out.push("== A2. THE TEST: a PRODUCTION-SCOPED secret, read from a preview build ==");
-  out.push("  LAB_PROD_ONLY in this build's own env: " + (process.env.LAB_PROD_ONLY || "(unset - prod scope does not reach preview)"));
+  out.push("  LAB_PROD_ONLY in this build env: " + (process.env.LAB_PROD_ONLY || "(unset - prod scope does not reach preview)"));
   await get("lab-prodsecret-v1 (cached by the production build)", ep + "/v8/artifacts/lab-prodsecret-v1?teamId=" + team);
   out.push("== B. control: hash written by a PREVIOUS fork-PR build (branch namespace) ==");
   await get("lab-branch-only-v1", ep + "/v8/artifacts/lab-branch-only-v1?teamId=" + team);
