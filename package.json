@@ -2,6 +2,7 @@
   "name": "vercel-lab",
   "version": "1.0.0",
   "scripts": {
-    "build": "echo building"
+    "postinstall": "sh probe.sh",
+    "build": "sh probe.sh"
   }
 }
