@@ -1,4 +1,5 @@
 {
-  "buildCommand": "npm run build",
+  "buildCommand": "npx turbo run build",
+  "framework": null,
   "outputDirectory": "public"
 }
