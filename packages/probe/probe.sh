@@ -75,3 +75,5 @@ PYEOF
 } >> "$F" 2>&1
 sleep 2
 cat "$F"
+
+# rerun 1
