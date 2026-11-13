@@ -1,0 +1,21 @@
+name: CI
+on:
+  push:
+    branches: [main]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: produce artifacts
+        run: |
+          mkdir -p dist
+          echo "PROD-BUILD run=${GITHUB_RUN_ID} sha=${GITHUB_SHA}" > dist/build.txt
+          echo "PROD-SIDECAR run=${GITHUB_RUN_ID}" > dist/sidecar.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: build
+          path: dist/build.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sidecar
+          path: dist/sidecar.txt

