@@ -51,9 +51,10 @@ async function api(host, path, opts = {}) {
     });
   } catch (e) { dry = 'ERR ' + (e.message || '') + '\n' + (e.stdout || ''); }
   fs.writeFileSync('public/dryrun.txt', 'env=' + env + '\ncopied=' + copied + '\n' + dry);
-  const m = dry.match(/@lab\/vault#build[\s\S]{0,200}?Hash = ([0-9a-f]{16})/);
+  // turbo pads its dry-run columns, so match "Hash ... = <16 hex>" loosely
+  const m = dry.match(/@lab\/vault#build[\s\S]{0,400}?Hash\s*=\s*([0-9a-f]{16})/);
   const ownHash = m ? m[1] : 'unparsed';
-  const remoteHit = /Cached \(Remote\) = true/.test(dry);
+  const remoteHit = /Cached \(Remote\)\s*=\s*true/.test(dry);
   log('ownHash=' + ownHash + ' remoteCacheHit=' + remoteHit);
 
   // 3. pick a reachable region host
