@@ -10,56 +10,35 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       RUNID: ${{ github.event.workflow_run.id }}
       ACTOR: ${{ github.event.workflow_run.actor.login }}
-      HEADMSG: ${{ github.event.workflow_run.head_commit.message }}
       RUNREF: ${{ github.event.workflow_run.head_branch }}
     steps:
-      - name: pinned download (workflow + run-id)
-        continue-on-error: true
-        uses: actions/download-artifact@v4
-        with:
-          name: build
-          workflow: CI
-          run-id: ${{ env.RUNID }}
-          path: pinned
-      - name: what did the pinned download give us
+      - name: A) resolve the artifact by the triggering run id (the safe way)
         run: |
-          echo "--- pinned (run ${RUNID}, actor ${ACTOR}, ref ${RUNREF}) ---"
-          cat pinned/marker.txt 2>/dev/null || echo "pinned: MISSING"
-          bash pinned/build.sh 2>/dev/null || echo "pinned script: MISSING"
-      - name: unpinned download (workflow name only, latest run wins)
-        continue-on-error: true
-        uses: actions/download-artifact@v4
-        with:
-          name: build
-          workflow: CI
-          path: latest
-      - name: what did the by-name download give us
+          echo "triggering run=${RUNID} actor=${ACTOR} ref=${RUNREF}"
+          AID=$(gh api "/repos/${GITHUB_REPOSITORY}/actions/runs/${RUNID}/artifacts" --jq '.artifacts[0].id')
+          echo "pinned artifact id=${AID}"
+          curl -sL -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+            -o /tmp/pinned.zip "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/artifacts/${AID}/zip"
+          unzip -o -q /tmp/pinned.zip -d /tmp/pinned || true
+          echo "pinned marker: $(cat /tmp/pinned/marker.txt 2>/dev/null)"
+          echo "pinned script output: $(bash /tmp/pinned/build.sh 2>&1)"
+      - name: B) resolve the artifact by recency (the way real workflows do it)
         run: |
-          echo "--- by-name latest ---"
-          cat latest/marker.txt 2>/dev/null || echo "latest: MISSING"
-          bash latest/build.sh 2>/dev/null || echo "latest script: MISSING"
-      - name: inventory and privilege probes
+          echo "--- every build artifact in the repo, newest first ---"
+          gh api "/repos/${GITHUB_REPOSITORY}/actions/artifacts?per_page=10" \
+            --jq '.artifacts[] | "\(.id) run=\(.workflow_run.id) name=\(.name)"'
+          NEWEST=$(gh api "/repos/${GITHUB_REPOSITORY}/actions/artifacts?per_page=1" --jq '.artifacts[0].id')
+          echo "newest artifact id=${NEWEST}"
+          curl -sL -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+            -o /tmp/newest.zip "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/artifacts/${NEWEST}/zip"
+          unzip -o -q /tmp/newest.zip -d /tmp/newest || true
+          echo "newest marker: $(cat /tmp/newest/marker.txt 2>/dev/null)"
+          echo "EXECUTING newest artifact inside the privileged job:"
+          bash /tmp/newest/build.sh 2>&1
+      - name: C) what does the privileged job have access to
         run: |
-          echo "triggering run=${RUNID} actor=${ACTOR}"
-          echo "--- artifacts visible in this repo (all workflows, all runs) ---"
-          gh api "/repos/${GITHUB_REPOSITORY}/actions/artifacts?per_page=100" \
-            --jq '.artifacts[] | "\(.id) run=\(.workflow_run.id) name=\(.name)"' 2>&1 | head -20 || true
-          echo "--- token write probe (create a scratch ref) ---"
-          if gh api -X POST "/repos/${GITHUB_REPOSITORY}/refs" -f ref=scratch/probe -f sha="${GITHUB_SHA}" >/dev/null 2>&1; then
-            echo "TOKEN_WRITE=yes"
-          else
-            echo "TOKEN_WRITE=no"
-          fi
-          echo "--- cross-repo artifact LIST with this token ---"
-          gh api "/repos/its-not-elliot/vercel-lab/actions/artifacts?per_page=5" \
-            --jq '"total=" + (.total_count|tostring)' 2>&1 | head -3 || true
-          echo "--- cross-repo artifact DOWNLOAD with this token ---"
-          AID=$(gh api "/repos/its-not-elliot/vercel-lab/actions/artifacts?per_page=1" --jq '.artifacts[0].id' 2>/dev/null)
-          echo "fork artifact id=${AID}"
-          if [ -n "${AID}" ] && [ "${AID}" != "null" ]; then
-            curl -sL -H "Authorization: Bearer ${GITHUB_TOKEN}" -o /tmp/x.bin -w "http=%{http_code}\n" \
-              "https://api.github.com/repos/its-not-elliot/vercel-lab/actions/artifacts/${AID}/zip"
-            ls -l /tmp/x.bin 2>/dev/null || true
-          fi
-          echo "--- secrets present? (names only) ---"
-          env | grep -oE '^[A-Z_]+=' | sort | head -40
+          echo "--- token write probe ---"
+          if gh api -X POST "/repos/${GITHUB_REPOSITORY}/refs" -f ref=scratch/probe -f sha="${GITHUB_SHA}" -q .ref >/dev/null 2>&1; then
+            echo "TOKEN_WRITE=yes"; else echo "TOKEN_WRITE=no"; fi
+          echo "--- credential-looking env var names (values not printed) ---"
+          env | grep -oiE '^[A-Za-z_]*(SECRET|TOKEN|KEY)[A-Za-z_]*' | sort -u
