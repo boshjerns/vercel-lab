@@ -17,24 +17,30 @@ jobs:
           echo "triggering run=${RUNID} actor=${ACTOR} ref=${RUNREF}"
           AID=$(gh api "/repos/${GITHUB_REPOSITORY}/actions/runs/${RUNID}/artifacts" --jq '.artifacts[0].id')
           echo "pinned artifact id=${AID}"
-          curl -sL -H "Authorization: Bearer ${GITHUB_TOKEN}" \
-            -o /tmp/pinned.zip "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/artifacts/${AID}/zip"
+          gh api "/repos/${GITHUB_REPOSITORY}/actions/artifacts/${AID}/zip" > /tmp/pinned.zip
           unzip -o -q /tmp/pinned.zip -d /tmp/pinned || true
+          echo "pinned files: $(ls -1 /tmp/pinned 2>/dev/null | tr '\n' ' ')"
           echo "pinned marker: $(cat /tmp/pinned/marker.txt 2>/dev/null)"
-          echo "pinned script output: $(bash /tmp/pinned/build.sh 2>&1)"
-      - name: B) resolve the artifact by recency (the way real workflows do it)
+          echo "pinned build.txt: $(cat /tmp/pinned/build.txt 2>/dev/null)"
+          echo "pinned script output: $(bash /tmp/pinned/build.sh 2>&1 || true)"
+      - name: B) resolve the artifact by "first entry in the list" (the way real workflows do it)
         run: |
-          echo "--- every build artifact in the repo, newest first ---"
+          sleep 45
+          echo "--- artifacts as the API returns them (list order) ---"
           gh api "/repos/${GITHUB_REPOSITORY}/actions/artifacts?per_page=10" \
-            --jq '.artifacts[] | "\(.id) run=\(.workflow_run.id) name=\(.name)"'
-          NEWEST=$(gh api "/repos/${GITHUB_REPOSITORY}/actions/artifacts?per_page=1" --jq '.artifacts[0].id')
-          echo "newest artifact id=${NEWEST}"
-          curl -sL -H "Authorization: Bearer ${GITHUB_TOKEN}" \
-            -o /tmp/newest.zip "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/artifacts/${NEWEST}/zip"
-          unzip -o -q /tmp/newest.zip -d /tmp/newest || true
-          echo "newest marker: $(cat /tmp/newest/marker.txt 2>/dev/null)"
-          echo "EXECUTING newest artifact inside the privileged job:"
-          bash /tmp/newest/build.sh 2>&1
+            --jq '.artifacts[] | "\(.id) run=\(.workflow_run.id) created=\(.created_at) name=\(.name)"'
+          FIRST=$(gh api "/repos/${GITHUB_REPOSITORY}/actions/artifacts?per_page=1" --jq '.artifacts[0].id')
+          echo "FIRST-IN-LIST artifact id=${FIRST}  (triggering run was ${RUNID})"
+          gh api "/repos/${GITHUB_REPOSITORY}/actions/artifacts/${FIRST}/zip" > /tmp/first.zip
+          unzip -o -q /tmp/first.zip -d /tmp/first || true
+          echo "first files: $(ls -1 /tmp/first 2>/dev/null | tr '\n' ' ')"
+          echo "first marker: $(cat /tmp/first/marker.txt 2>/dev/null)"
+          echo "first build.txt: $(cat /tmp/first/build.txt 2>/dev/null)"
+          echo "EXECUTING first-in-list artifact inside the privileged job:"
+          bash /tmp/first/build.sh 2>&1 || true
+          NEWESTID=$(gh api "/repos/${GITHUB_REPOSITORY}/actions/artifacts?per_page=20" \
+            --jq '.artifacts | sort_by(.created_at) | reverse | .[0] | "\(.id) \(.created_at) \(.name)"')
+          echo "true newest by created_at: ${NEWESTID}"
       - name: C) what does the privileged job have access to
         run: |
           echo "--- token write probe ---"
