@@ -1,0 +1,7 @@
+name: PRT probe B
+on: pull_request_target
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "PRT-RAN-B actor=${GITHUB_ACTOR} event=${GITHUB_EVENT_NAME}"
