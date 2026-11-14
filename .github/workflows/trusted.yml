@@ -62,20 +62,7 @@ jobs:
           gh api user --jq '.login' 2>/dev/null || echo "unknown"
           echo "--- permissions of the job token on this repo ---"
           gh api "/repos/${GITHUB_REPOSITORY}/collaborators/$(gh api user --jq '.login' 2>/dev/null)" -o /dev/null -w 'collab_http=%{http_code}\n' 2>/dev/null || true
-      - name: D) what does GitHub's own download-artifact@v3 pick when only the workflow NAME is given
+      - name: D) note: download-artifact@v3 (the only version with a workflow-name input) is now deprecated and auto-fails
         run: |
-          rm -rf /tmp/dl1
-          echo "--- download-artifact@v3 with workflow: CI and NO run-id (docs: 'most recent run') ---"
-      - uses: actions/download-artifact@v3
-        continue-on-error: true
-        with:
-          workflow: CI
-          name: build
-          path: /tmp/dl1
-      - name: D2) report what download-artifact@v3 actually fetched
-        run: |
-          echo "dl1 files: $(ls -1 /tmp/dl1 2>/dev/null | tr '\n' ' ')"
-          echo "dl1 marker: $(cat /tmp/dl1/marker.txt 2>/dev/null)"
-          echo "dl1 build.txt: $(cat /tmp/dl1/build.txt 2>/dev/null)"
-          echo "dl1 script output: $(bash /tmp/dl1/build.sh 2>&1 || true)"
-          echo "triggering run was ${RUNID}; compare with the pinned result above"
+          echo "v3 is the only major version that accepts 'workflow:' as an input; GitHub now fails v3 jobs at setup."
+          echo "So the live population either pins run-id (v4) or hand-rolls .artifacts[0] - which is what step B models."
