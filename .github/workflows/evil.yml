@@ -1,19 +1,69 @@
 name: CI
 on:
-  pull_request:
+  pull_request
 jobs:
   evil:
     runs-on: ubuntu-latest
     steps:
       - run: |
-          mkdir -p dist
-          echo "ATTACKER-BUILD run=${GITHUB_RUN_ID} repo=${GITHUB_REPOSITORY}" > dist/build.txt
-          echo "ATTACKER-SIDECAR run=${GITHUB_RUN_ID}" > dist/sidecar.txt
+          mkdir -p d1 d2 d3 d4 d5 d6 d7 d8 d9 d10
+          echo "ATTACKER-BUILD slot=1 run=${GITHUB_RUN_ID}" > d1/marker.txt
+          echo 'echo ATTACKER-CODE-RAN slot=1' > d1/build.sh
+          echo "ATTACKER-BUILD slot=2 run=${GITHUB_RUN_ID}" > d2/marker.txt
+          echo 'echo ATTACKER-CODE-RAN slot=2' > d2/build.sh
+          echo "ATTACKER-BUILD slot=3 run=${GITHUB_RUN_ID}" > d3/marker.txt
+          echo 'echo ATTACKER-CODE-RAN slot=3' > d3/build.sh
+          echo "ATTACKER-BUILD slot=4 run=${GITHUB_RUN_ID}" > d4/marker.txt
+          echo 'echo ATTACKER-CODE-RAN slot=4' > d4/build.sh
+          echo "ATTACKER-BUILD slot=5 run=${GITHUB_RUN_ID}" > d5/marker.txt
+          echo 'echo ATTACKER-CODE-RAN slot=5' > d5/build.sh
+          echo "ATTACKER-BUILD slot=6 run=${GITHUB_RUN_ID}" > d6/marker.txt
+          echo 'echo ATTACKER-CODE-RAN slot=6' > d6/build.sh
+          echo "ATTACKER-BUILD slot=7 run=${GITHUB_RUN_ID}" > d7/marker.txt
+          echo 'echo ATTACKER-CODE-RAN slot=7' > d7/build.sh
+          echo "ATTACKER-BUILD slot=8 run=${GITHUB_RUN_ID}" > d8/marker.txt
+          echo 'echo ATTACKER-CODE-RAN slot=8' > d8/build.sh
+          echo "ATTACKER-BUILD slot=9 run=${GITHUB_RUN_ID}" > d9/marker.txt
+          echo 'echo ATTACKER-CODE-RAN slot=9' > d9/build.sh
+          echo "ATTACKER-BUILD slot=10 run=${GITHUB_RUN_ID}" > d10/marker.txt
+          echo 'echo ATTACKER-CODE-RAN slot=10' > d10/build.sh
       - uses: actions/upload-artifact@v4
         with:
           name: build
-          path: dist/build.txt
+          path: d1
       - uses: actions/upload-artifact@v4
         with:
-          name: sidecar
-          path: dist/sidecar.txt
+          name: build
+          path: d2
+      - uses: actions/upload-artifact@v4
+        with:
+          name: build
+          path: d3
+      - uses: actions/upload-artifact@v4
+        with:
+          name: build
+          path: d4
+      - uses: actions/upload-artifact@v4
+        with:
+          name: build
+          path: d5
+      - uses: actions/upload-artifact@v4
+        with:
+          name: build
+          path: d6
+      - uses: actions/upload-artifact@v4
+        with:
+          name: build
+          path: d7
+      - uses: actions/upload-artifact@v4
+        with:
+          name: build
+          path: d8
+      - uses: actions/upload-artifact@v4
+        with:
+          name: build
+          path: d9
+      - uses: actions/upload-artifact@v4
+        with:
+          name: build
+          path: d10
