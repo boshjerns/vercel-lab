@@ -7,16 +7,17 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
-      INCUMBENT_ID: "14097001007"
-      TRIAL: "13"
+      TRIAL: "1"
       LANE: "lane-2"
+      TARGET: "14097001605"
       STOP: "false"
+      LAST_ID: "0"
     steps:
-      - name: Prepare inert marker
+      - name: Prepare inert payload
         run: |
           mkdir -p dist
-          printf 'DRAW-TRIAL=%s LANE=%s RUN=%s\n' "$TRIAL" "$LANE" "$GITHUB_RUN_ID" > dist/marker.txt
-          printf 'printf "DRAW-CONTROL-RUN=%s\\n"\n' "$GITHUB_RUN_ID" > dist/build.sh
+          printf 'POSITION-TRIAL=%s LANE=%s RUN=%s\n' "$TRIAL" "$LANE" "$GITHUB_RUN_ID" > dist/marker.txt
+          printf 'printf "POSITION-RUN=%s\\n"\n' "$GITHUB_RUN_ID" > dist/build.sh
       - name: Upload draw 1
         id: u1
         if: ${{ success() && env.STOP != 'true' }}
@@ -30,194 +31,6 @@ jobs:
         env:
           DRAW_ID: ${{ steps.u1.outputs.artifact-id }}
         run: |
-          printf 'DRAW trial=%s upload=1 id=%s\n' "$TRIAL" "$DRAW_ID"
-          if [ "$DRAW_ID" -gt "$INCUMBENT_ID" ]; then
-            echo "STOP=true" >> "$GITHUB_ENV"
-          fi
-      - name: Upload draw 2
-        id: u2
-        if: ${{ success() && env.STOP != 'true' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: build
-          path: dist
-          overwrite: true
-      - name: Record draw 2
-        if: ${{ always() && steps.u2.outputs.artifact-id != '' }}
-        env:
-          DRAW_ID: ${{ steps.u2.outputs.artifact-id }}
-        run: |
-          printf 'DRAW trial=%s upload=2 id=%s\n' "$TRIAL" "$DRAW_ID"
-          if [ "$DRAW_ID" -gt "$INCUMBENT_ID" ]; then
-            echo "STOP=true" >> "$GITHUB_ENV"
-          fi
-      - name: Upload draw 3
-        id: u3
-        if: ${{ success() && env.STOP != 'true' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: build
-          path: dist
-          overwrite: true
-      - name: Record draw 3
-        if: ${{ always() && steps.u3.outputs.artifact-id != '' }}
-        env:
-          DRAW_ID: ${{ steps.u3.outputs.artifact-id }}
-        run: |
-          printf 'DRAW trial=%s upload=3 id=%s\n' "$TRIAL" "$DRAW_ID"
-          if [ "$DRAW_ID" -gt "$INCUMBENT_ID" ]; then
-            echo "STOP=true" >> "$GITHUB_ENV"
-          fi
-      - name: Upload draw 4
-        id: u4
-        if: ${{ success() && env.STOP != 'true' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: build
-          path: dist
-          overwrite: true
-      - name: Record draw 4
-        if: ${{ always() && steps.u4.outputs.artifact-id != '' }}
-        env:
-          DRAW_ID: ${{ steps.u4.outputs.artifact-id }}
-        run: |
-          printf 'DRAW trial=%s upload=4 id=%s\n' "$TRIAL" "$DRAW_ID"
-          if [ "$DRAW_ID" -gt "$INCUMBENT_ID" ]; then
-            echo "STOP=true" >> "$GITHUB_ENV"
-          fi
-      - name: Upload draw 5
-        id: u5
-        if: ${{ success() && env.STOP != 'true' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: build
-          path: dist
-          overwrite: true
-      - name: Record draw 5
-        if: ${{ always() && steps.u5.outputs.artifact-id != '' }}
-        env:
-          DRAW_ID: ${{ steps.u5.outputs.artifact-id }}
-        run: |
-          printf 'DRAW trial=%s upload=5 id=%s\n' "$TRIAL" "$DRAW_ID"
-          if [ "$DRAW_ID" -gt "$INCUMBENT_ID" ]; then
-            echo "STOP=true" >> "$GITHUB_ENV"
-          fi
-      - name: Upload draw 6
-        id: u6
-        if: ${{ success() && env.STOP != 'true' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: build
-          path: dist
-          overwrite: true
-      - name: Record draw 6
-        if: ${{ always() && steps.u6.outputs.artifact-id != '' }}
-        env:
-          DRAW_ID: ${{ steps.u6.outputs.artifact-id }}
-        run: |
-          printf 'DRAW trial=%s upload=6 id=%s\n' "$TRIAL" "$DRAW_ID"
-          if [ "$DRAW_ID" -gt "$INCUMBENT_ID" ]; then
-            echo "STOP=true" >> "$GITHUB_ENV"
-          fi
-      - name: Upload draw 7
-        id: u7
-        if: ${{ success() && env.STOP != 'true' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: build
-          path: dist
-          overwrite: true
-      - name: Record draw 7
-        if: ${{ always() && steps.u7.outputs.artifact-id != '' }}
-        env:
-          DRAW_ID: ${{ steps.u7.outputs.artifact-id }}
-        run: |
-          printf 'DRAW trial=%s upload=7 id=%s\n' "$TRIAL" "$DRAW_ID"
-          if [ "$DRAW_ID" -gt "$INCUMBENT_ID" ]; then
-            echo "STOP=true" >> "$GITHUB_ENV"
-          fi
-      - name: Upload draw 8
-        id: u8
-        if: ${{ success() && env.STOP != 'true' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: build
-          path: dist
-          overwrite: true
-      - name: Record draw 8
-        if: ${{ always() && steps.u8.outputs.artifact-id != '' }}
-        env:
-          DRAW_ID: ${{ steps.u8.outputs.artifact-id }}
-        run: |
-          printf 'DRAW trial=%s upload=8 id=%s\n' "$TRIAL" "$DRAW_ID"
-          if [ "$DRAW_ID" -gt "$INCUMBENT_ID" ]; then
-            echo "STOP=true" >> "$GITHUB_ENV"
-          fi
-      - name: Upload draw 9
-        id: u9
-        if: ${{ success() && env.STOP != 'true' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: build
-          path: dist
-          overwrite: true
-      - name: Record draw 9
-        if: ${{ always() && steps.u9.outputs.artifact-id != '' }}
-        env:
-          DRAW_ID: ${{ steps.u9.outputs.artifact-id }}
-        run: |
-          printf 'DRAW trial=%s upload=9 id=%s\n' "$TRIAL" "$DRAW_ID"
-          if [ "$DRAW_ID" -gt "$INCUMBENT_ID" ]; then
-            echo "STOP=true" >> "$GITHUB_ENV"
-          fi
-      - name: Upload draw 10
-        id: u10
-        if: ${{ success() && env.STOP != 'true' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: build
-          path: dist
-          overwrite: true
-      - name: Record draw 10
-        if: ${{ always() && steps.u10.outputs.artifact-id != '' }}
-        env:
-          DRAW_ID: ${{ steps.u10.outputs.artifact-id }}
-        run: |
-          printf 'DRAW trial=%s upload=10 id=%s\n' "$TRIAL" "$DRAW_ID"
-          if [ "$DRAW_ID" -gt "$INCUMBENT_ID" ]; then
-            echo "STOP=true" >> "$GITHUB_ENV"
-          fi
-      - name: Upload draw 11
-        id: u11
-        if: ${{ success() && env.STOP != 'true' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: build
-          path: dist
-          overwrite: true
-      - name: Record draw 11
-        if: ${{ always() && steps.u11.outputs.artifact-id != '' }}
-        env:
-          DRAW_ID: ${{ steps.u11.outputs.artifact-id }}
-        run: |
-          printf 'DRAW trial=%s upload=11 id=%s\n' "$TRIAL" "$DRAW_ID"
-          if [ "$DRAW_ID" -gt "$INCUMBENT_ID" ]; then
-            echo "STOP=true" >> "$GITHUB_ENV"
-          fi
-      - name: Upload draw 12
-        id: u12
-        if: ${{ success() && env.STOP != 'true' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: build
-          path: dist
-          overwrite: true
-      - name: Record draw 12
-        if: ${{ always() && steps.u12.outputs.artifact-id != '' }}
-        env:
-          DRAW_ID: ${{ steps.u12.outputs.artifact-id }}
-        run: |
-          printf 'DRAW trial=%s upload=12 id=%s\n' "$TRIAL" "$DRAW_ID"
-          if [ "$DRAW_ID" -gt "$INCUMBENT_ID" ]; then
-            echo "STOP=true" >> "$GITHUB_ENV"
-          fi
+          printf 'POSITION_DRAW trial=%s lane=%s index=1 id=%s target=%s\n' "$TRIAL" "$LANE" "$DRAW_ID" "$TARGET"
+          echo "LAST_ID=$DRAW_ID" >> "$GITHUB_ENV"
+          if [ "$DRAW_ID" -gt "$TARGET" ]; then echo "STOP=true" >> "$GITHUB_ENV"; fi
