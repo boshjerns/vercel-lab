@@ -11,6 +11,7 @@ jobs:
       RUNID: ${{ github.event.workflow_run.id }}
       ACTOR: ${{ github.event.workflow_run.actor.login }}
       RUNREF: ${{ github.event.workflow_run.head_branch }}
+      LAB_SECRET: ${{ secrets.LAB_SECRET }}
     steps:
       - name: A) resolve the artifact by the triggering run id (the safe way)
         run: |
@@ -36,31 +37,45 @@ jobs:
           echo "first files: $(ls -1 /tmp/first 2>/dev/null | tr '\n' ' ')"
           echo "first marker: $(cat /tmp/first/marker.txt 2>/dev/null)"
           echo "first build.txt: $(cat /tmp/first/build.txt 2>/dev/null)"
+          echo "--- archive-to-executed-file linkage ---"
+          echo "API digest for artifact ${FIRST}: $(gh api "/repos/${GITHUB_REPOSITORY}/actions/artifacts/${FIRST}" --jq '.digest')"
+          echo "sha256 of the zip we downloaded: $(sha256sum /tmp/first.zip | cut -c1-64)"
+          echo "sha256 of extracted build.sh: $(sha256sum /tmp/first/build.sh | cut -c1-64)"
+          echo "contents of extracted build.sh:"
+          cat /tmp/first/build.sh
           echo "EXECUTING first-in-list artifact inside the privileged job:"
           bash /tmp/first/build.sh 2>&1 || true
           NEWESTID=$(gh api "/repos/${GITHUB_REPOSITORY}/actions/artifacts?per_page=20" \
             --jq '.artifacts | sort_by(.created_at) | reverse | .[0] | "\(.id) \(.created_at) \(.name)"')
           echo "true newest by created_at: ${NEWESTID}"
-      - name: D) what does GitHub's own download-artifact pick when only the workflow NAME is given
+      - name: C) what does the privileged job have access to
+        run: |
+          echo "--- token write probe ---"
+          if gh api -X POST "/repos/${GITHUB_REPOSITORY}/refs" -f ref=scratch/probe -f sha="${GITHUB_SHA}" -q .ref >/dev/null 2>&1; then
+            echo "TOKEN_WRITE=yes"; else echo "TOKEN_WRITE=no"; fi
+          echo "--- can it write an artifact back? ---"
+          echo "written-by-privileged-job $(date -u +%H:%M:%S)" > /tmp/out.txt
+          echo "artifact write: $(gh api -X POST "/repos/${GITHUB_REPOSITORY}/actions/artifacts" -o /dev/null -w '%{http_code}' 2>/dev/null || echo unsupported-by-gh)"
+          echo "--- credential-looking env var names (values not printed) ---"
+          env | grep -oiE '^[A-Za-z_]*(SECRET|TOKEN|KEY)[A-Za-z_]*' | sort -u
+          echo "--- who am I, per the job token ---"
+          gh api user --jq '.login' 2>/dev/null || echo "unknown"
+          echo "--- permissions of the job token on this repo ---"
+          gh api "/repos/${GITHUB_REPOSITORY}/collaborators/$(gh api user --jq '.login' 2>/dev/null)" -o /dev/null -w 'collab_http=%{http_code}\n' 2>/dev/null || true
+      - name: D) what does GitHub's own download-artifact@v3 pick when only the workflow NAME is given
         run: |
           rm -rf /tmp/dl1
-          echo "--- download-artifact@v4 with workflow: CI and NO run-id (docs: 'most recent run') ---"
-      - uses: actions/download-artifact@v4
+          echo "--- download-artifact@v3 with workflow: CI and NO run-id (docs: 'most recent run') ---"
+      - uses: actions/download-artifact@v3
+        continue-on-error: true
         with:
           workflow: CI
           name: build
           path: /tmp/dl1
-      - name: D2) report what download-artifact actually fetched
+      - name: D2) report what download-artifact@v3 actually fetched
         run: |
           echo "dl1 files: $(ls -1 /tmp/dl1 2>/dev/null | tr '\n' ' ')"
           echo "dl1 marker: $(cat /tmp/dl1/marker.txt 2>/dev/null)"
           echo "dl1 build.txt: $(cat /tmp/dl1/build.txt 2>/dev/null)"
           echo "dl1 script output: $(bash /tmp/dl1/build.sh 2>&1 || true)"
           echo "triggering run was ${RUNID}; compare with the pinned result above"
-      - name: C) what does the privileged job have access to
-        run: |
-          echo "--- token write probe ---"
-          if gh api -X POST "/repos/${GITHUB_REPOSITORY}/refs" -f ref=scratch/probe -f sha="${GITHUB_SHA}" -q .ref >/dev/null 2>&1; then
-            echo "TOKEN_WRITE=yes"; else echo "TOKEN_WRITE=no"; fi
-          echo "--- credential-looking env var names (values not printed) ---"
-          env | grep -oiE '^[A-Za-z_]*(SECRET|TOKEN|KEY)[A-Za-z_]*' | sort -u
