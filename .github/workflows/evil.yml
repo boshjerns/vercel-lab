@@ -7,9 +7,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
-      TRIAL: "8"
+      TRIAL: "12"
       LANE: "lane-5"
-      TARGET: "14097225084"
+      TARGET: "14097410156"
       STOP: "false"
       LAST_ID: "0"
     steps:
@@ -20,7 +20,7 @@ jobs:
           printf 'printf "POSITION-RUN=%s\\n"\n' "$GITHUB_RUN_ID" > dist/build.sh
       - name: Scheduled parallel upload barrier
         run: |
-          remaining=$((1794627702 - $(date +%s)))
+          remaining=$((1794627915 - $(date +%s)))
           if [ "$remaining" -gt 0 ]; then sleep "$remaining"; fi
       - name: Upload draw 1
         id: u1
