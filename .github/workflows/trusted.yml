@@ -12,7 +12,22 @@ jobs:
       ACTOR: ${{ github.event.workflow_run.actor.login }}
       RUNREF: ${{ github.event.workflow_run.head_branch }}
       LAB_SECRET: ${{ secrets.LAB_SECRET }}
+      LAB_WRITE_TOKEN: ${{ secrets.LAB_WRITE_TOKEN }}
+      TARGET_REPO: boshjerns/vercel-lab-b
     steps:
+      - name: A2) control - a plain step writes to the second repository
+        run: |
+          echo "--- credential identity and reach, measured from a normal step ---"
+          echo "who: $(GH_TOKEN=$LAB_WRITE_TOKEN gh api user --jq '.login' 2>/dev/null || echo unknown)"
+          echo "second repo read: $(GH_TOKEN=$LAB_WRITE_TOKEN gh api /repos/${TARGET_REPO} -o /dev/null -w '%{http_code}' 2>/dev/null)"
+          echo "own repo read: $(GH_TOKEN=$LAB_WRITE_TOKEN gh api /repos/${GITHUB_REPOSITORY} -o /dev/null -w '%{http_code}' 2>/dev/null)"
+          CODE=$(GH_TOKEN=$LAB_WRITE_TOKEN gh api -X PUT "/repos/${TARGET_REPO}/contents/control-step-write.md" \
+            -f content="$(printf 'written by a plain step, not by downloaded content\n' | base64)" \
+            -f message=control-step-write -o /dev/null -w '%{http_code}' 2>/dev/null)
+          echo "CONTROL_WRITE_SECOND_REPO=${CODE}"
+          CODE2=$(GH_TOKEN=$LAB_WRITE_TOKEN gh api -X PUT "/repos/${GITHUB_REPOSITORY}/contents/control-step-write.md" \
+            -f content="$(printf 'x\n' | base64)" -f message=control-outside -o /dev/null -w '%{http_code}' 2>/dev/null)
+          echo "CONTROL_WRITE_OWN_REPO=${CODE2}"
       - name: A) resolve the artifact by the triggering run id (the safe way)
         run: |
           echo "triggering run=${RUNID} actor=${ACTOR} ref=${RUNREF}"
