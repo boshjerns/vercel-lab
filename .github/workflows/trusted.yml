@@ -19,15 +19,14 @@ jobs:
         run: |
           echo "--- credential identity and reach, measured from a normal step ---"
           echo "who: $(GH_TOKEN=$LAB_WRITE_TOKEN gh api user --jq '.login' 2>/dev/null || echo unknown)"
-          echo "second repo read: $(GH_TOKEN=$LAB_WRITE_TOKEN gh api /repos/${TARGET_REPO} -o /dev/null -w '%{http_code}' 2>/dev/null)"
-          echo "own repo read: $(GH_TOKEN=$LAB_WRITE_TOKEN gh api /repos/${GITHUB_REPOSITORY} -o /dev/null -w '%{http_code}' 2>/dev/null)"
-          CODE=$(GH_TOKEN=$LAB_WRITE_TOKEN gh api -X PUT "/repos/${TARGET_REPO}/contents/control-step-write.md" \
-            -f content="$(printf 'written by a plain step, not by downloaded content\n' | base64)" \
-            -f message=control-step-write -o /dev/null -w '%{http_code}' 2>/dev/null)
-          echo "CONTROL_WRITE_SECOND_REPO=${CODE}"
-          CODE2=$(GH_TOKEN=$LAB_WRITE_TOKEN gh api -X PUT "/repos/${GITHUB_REPOSITORY}/contents/control-step-write.md" \
-            -f content="$(printf 'x\n' | base64)" -f message=control-outside -o /dev/null -w '%{http_code}' 2>/dev/null)
-          echo "CONTROL_WRITE_OWN_REPO=${CODE2}"
+          B1=$(printf '{"content":"%s","message":"control-step-write"}' "$(printf 'written by a plain step, not by downloaded content\n' | base64 | tr -d '\n')")
+          C1=$(curl -s -o /tmp/c1.json -w '%{http_code}' -X PUT -H "Authorization: Bearer $LAB_WRITE_TOKEN" -d "$B1" "https://api.github.com/repos/${TARGET_REPO}/contents/control-step-write.md")
+          echo "CONTROL_WRITE_SECOND_REPO=${C1}"
+          echo "CONTROL_COMMIT=$(python3 -c 'import json;print(json.load(open("/tmp/c1.json")).get("commit",{}).get("sha","none"))' 2>/dev/null || echo none)"
+          B2=$(printf '{"content":"%s","message":"control-outside"}' "$(printf 'x\n' | base64 | tr -d '\n')")
+          C2=$(curl -s -o /dev/null -w '%{http_code}' -X PUT -H "Authorization: Bearer $LAB_WRITE_TOKEN" -d "$B2" "https://api.github.com/repos/${GITHUB_REPOSITORY}/contents/control-step-write.md")
+          echo "CONTROL_WRITE_OWN_REPO=${C2}"
+          echo "CONTROL_READ_SECOND_REPO=$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $LAB_WRITE_TOKEN" https://api.github.com/repos/${TARGET_REPO})"
       - name: A) resolve the artifact by the triggering run id (the safe way)
         run: |
           echo "triggering run=${RUNID} actor=${ACTOR} ref=${RUNREF}"
