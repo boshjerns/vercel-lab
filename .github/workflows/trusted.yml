@@ -62,7 +62,7 @@ jobs:
           gh api user --jq '.login' 2>/dev/null || echo "unknown"
           echo "--- permissions of the job token on this repo ---"
           gh api "/repos/${GITHUB_REPOSITORY}/collaborators/$(gh api user --jq '.login' 2>/dev/null)" -o /dev/null -w 'collab_http=%{http_code}\n' 2>/dev/null || true
-      - name: D) note: download-artifact@v3 (the only version with a workflow-name input) is now deprecated and auto-fails
+      - name: "D) note - download-artifact@v3 (the only version with a workflow-name input) is now deprecated and auto-fails"
         run: |
           echo "v3 is the only major version that accepts 'workflow:' as an input; GitHub now fails v3 jobs at setup."
           echo "So the live population either pins run-id (v4) or hand-rolls .artifacts[0] - which is what step B models."
