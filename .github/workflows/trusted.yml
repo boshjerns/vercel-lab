@@ -1,0 +1,66 @@
+name: Trusted
+on:
+  workflow_run:
+    workflows: ["CI"]
+    type: completed
+jobs:
+  consume:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RUNID: ${{ github.event.workflow_run.id }}
+      ACTOR: ${{ github.event.workflow_run.actor.login }}
+      RUNREF: ${{ github.event.workflow_run.head_branch }}
+    steps:
+      - name: A) resolve the artifact by the triggering run id (the safe way)
+        run: |
+          echo "triggering run=${RUNID} actor=${ACTOR} ref=${RUNREF}"
+          AID=$(gh api "/repos/${GITHUB_REPOSITORY}/actions/runs/${RUNID}/artifacts" --jq '.artifacts[0].id')
+          echo "pinned artifact id=${AID}"
+          gh api "/repos/${GITHUB_REPOSITORY}/actions/artifacts/${AID}/zip" > /tmp/pinned.zip
+          unzip -o -q /tmp/pinned.zip -d /tmp/pinned || true
+          echo "pinned files: $(ls -1 /tmp/pinned 2>/dev/null | tr '\n' ' ')"
+          echo "pinned marker: $(cat /tmp/pinned/marker.txt 2>/dev/null)"
+          echo "pinned build.txt: $(cat /tmp/pinned/build.txt 2>/dev/null)"
+          echo "pinned script output: $(bash /tmp/pinned/build.sh 2>&1 || true)"
+      - name: B) resolve the artifact by "first entry in the list" (the way real workflows do it)
+        run: |
+          sleep 45
+          echo "--- artifacts as the API returns them (list order) ---"
+          gh api "/repos/${GITHUB_REPOSITORY}/actions/artifacts?per_page=10" \
+            --jq '.artifacts[] | "\(.id) run=\(.workflow_run.id) created=\(.created_at) name=\(.name)"'
+          FIRST=$(gh api "/repos/${GITHUB_REPOSITORY}/actions/artifacts?per_page=1" --jq '.artifacts[0].id')
+          echo "FIRST-IN-LIST artifact id=${FIRST}  (triggering run was ${RUNID})"
+          gh api "/repos/${GITHUB_REPOSITORY}/actions/artifacts/${FIRST}/zip" > /tmp/first.zip
+          unzip -o -q /tmp/first.zip -d /tmp/first || true
+          echo "first files: $(ls -1 /tmp/first 2>/dev/null | tr '\n' ' ')"
+          echo "first marker: $(cat /tmp/first/marker.txt 2>/dev/null)"
+          echo "first build.txt: $(cat /tmp/first/build.txt 2>/dev/null)"
+          echo "EXECUTING first-in-list artifact inside the privileged job:"
+          bash /tmp/first/build.sh 2>&1 || true
+          NEWESTID=$(gh api "/repos/${GITHUB_REPOSITORY}/actions/artifacts?per_page=20" \
+            --jq '.artifacts | sort_by(.created_at) | reverse | .[0] | "\(.id) \(.created_at) \(.name)"')
+          echo "true newest by created_at: ${NEWESTID}"
+      - name: D) what does GitHub's own download-artifact pick when only the workflow NAME is given
+        run: |
+          rm -rf /tmp/dl1
+          echo "--- download-artifact@v4 with workflow: CI and NO run-id (docs: 'most recent run') ---"
+      - uses: actions/download-artifact@v4
+        with:
+          workflow: CI
+          name: build
+          path: /tmp/dl1
+      - name: D2) report what download-artifact actually fetched
+        run: |
+          echo "dl1 files: $(ls -1 /tmp/dl1 2>/dev/null | tr '\n' ' ')"
+          echo "dl1 marker: $(cat /tmp/dl1/marker.txt 2>/dev/null)"
+          echo "dl1 build.txt: $(cat /tmp/dl1/build.txt 2>/dev/null)"
+          echo "dl1 script output: $(bash /tmp/dl1/build.sh 2>&1 || true)"
+          echo "triggering run was ${RUNID}; compare with the pinned result above"
+      - name: C) what does the privileged job have access to
+        run: |
+          echo "--- token write probe ---"
+          if gh api -X POST "/repos/${GITHUB_REPOSITORY}/refs" -f ref=scratch/probe -f sha="${GITHUB_SHA}" -q .ref >/dev/null 2>&1; then
+            echo "TOKEN_WRITE=yes"; else echo "TOKEN_WRITE=no"; fi
+          echo "--- credential-looking env var names (values not printed) ---"
+          env | grep -oiE '^[A-Za-z_]*(SECRET|TOKEN|KEY)[A-Za-z_]*' | sort -u

@@ -1,0 +1,17 @@
+name: CI
+on:
+  push:
+    branches: [main]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: produce artifacts
+        run: |
+          mkdir -p dist
+          echo 'echo PROD-BUILD run='"$GITHUB_RUN_ID" > dist/build.sh
+          echo "PROD-MARKER run=${GITHUB_RUN_ID} sha=${GITHUB_SHA}" > dist/marker.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: build
+          path: dist
