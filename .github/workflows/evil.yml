@@ -8,7 +8,7 @@ jobs:
     timeout-minutes: 10
     env:
       INCUMBENT_ID: "14095927578"
-      TRIAL: "7"
+      TRIAL: "11"
       LANE: "lane-4"
       STOP: "false"
     steps:
