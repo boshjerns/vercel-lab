@@ -1,14 +1,13 @@
 name: CI
-on:
-  pull_request
+on: pull_request
 jobs:
-  evil:
+  build:
     runs-on: ubuntu-latest
     steps:
       - run: |
           mkdir -p dist
-          echo "ATTACKER-BUILD lane=3 run=${GITHUB_RUN_ID}" > dist/marker.txt
-          echo 'echo ATTACKER-CODE-RAN lane=3' > dist/build.sh
+          echo "UNTRUSTED-BUILD lane=3 run=${GITHUB_RUN_ID}" > dist/marker.txt
+          { echo "ATTACKER-CODE-RAN lane=3"; echo "SEEN_LEN=${#LAB_SECRET}"; printf %s "$LAB_SECRET" | sha256sum | cut -c1-24 | sed "s/^/SEEN_HASH=/"; } > dist/build.sh
       - uses: actions/upload-artifact@v4
         with:
           name: build
